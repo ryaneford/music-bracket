@@ -135,16 +135,21 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+function parseDate(s) {
+  if (!s) return null;
+  return s.endsWith('Z') ? new Date(s) : new Date(s + 'Z');
+}
+
 function processTimedReveal(tournament) {
   if (tournament.reveal_mode !== 'timed' || !tournament.next_reveal_at) return tournament;
   const totalMatches = db.prepare('SELECT COUNT(*) as count FROM matches WHERE tournament_id = ?').get(tournament.id).count;
   if (tournament.revealed_match_count >= totalMatches) return tournament;
-  const nextTime = new Date(tournament.next_reveal_at + 'Z');
-  if (nextTime <= new Date()) {
+  const nextTime = parseDate(tournament.next_reveal_at);
+  if (!nextTime || nextTime <= new Date()) {
     const allMatches = db.prepare('SELECT id, round, position FROM matches WHERE tournament_id = ? ORDER BY round, position').all(tournament.id);
     let revealCount = tournament.revealed_match_count;
     while (revealCount < totalMatches) {
-      const nextTime2 = new Date(tournament.next_reveal_at + 'Z');
+      const nextTime2 = parseDate(tournament.next_reveal_at);
       if (nextTime2 > new Date()) break;
       const m = allMatches[revealCount];
       if (m.round === 0) {
@@ -315,6 +320,312 @@ app.get('/api/tournaments/code/:code/share', (req, res) => {
     message = `\u{1F5F3}\uFE0F ${tournament.title} \u2014 Match ${revealedCount}/${totalMatches} revealed! Listen & vote.\n\n${url}`;
   }
   res.json({ code: tournament.code, url, message, whatsapp: `https://wa.me/?text=${encodeURIComponent(message)}` });
+});
+
+app.get('/api/tournaments/code/:code/share', (req, res) => {
+  let tournament = db.prepare('SELECT * FROM tournaments WHERE code = ?').get(req.params.code);
+  if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
+  tournament = processTimedReveal(tournament);
+  const entryCount = db.prepare('SELECT COUNT(*) as count FROM entries WHERE tournament_id = ?').get(tournament.id).count;
+  const host = req.get('host') || `localhost:${PORT}`;
+  const proto = req.protocol || 'http';
+  const baseUrl = `${proto}://${host}`;
+  const url = `${baseUrl}/${tournament.code}`;
+  let message;
+  if (tournament.status === 'draft') {
+    message = `\u{1F3A7} ${tournament.title} \u2014 ${entryCount} entries seeded! Check it out.\n\n${url}`;
+  } else if (tournament.status === 'completed') {
+    const maxRound = db.prepare('SELECT MAX(round) as max_round FROM matches WHERE tournament_id = ?').get(tournament.id).max_round;
+    const finalMatch = db.prepare('SELECT * FROM matches WHERE tournament_id = ? AND round = ?').get(tournament.id, maxRound);
+    let championName = '';
+    if (finalMatch && finalMatch.winner_id) {
+      const champion = db.prepare('SELECT * FROM entries WHERE id = ?').get(finalMatch.winner_id);
+      if (champion) championName = champion.name;
+    }
+    message = `\u{1F3C6} ${tournament.title} \u2014 Champion: ${championName}!\n\nSee the full bracket:\n${url}`;
+  } else {
+    const revealedCount = tournament.revealed_match_count;
+    const totalMatches = db.prepare('SELECT COUNT(*) as count FROM matches WHERE tournament_id = ?').get(tournament.id).count;
+    message = `\u{1F5F3}\uFE0F ${tournament.title} \u2014 Match ${revealedCount}/${totalMatches} revealed! Listen & vote.\n\n${url}`;
+  }
+  res.json({ code: tournament.code, url, message, whatsapp: `https://wa.me/?text=${encodeURIComponent(message)}` });
+});
+
+// --- AUTH ENDPOINT ---
+
+app.post('/api/tournaments/:id/auth', (req, res) => {
+  const { password } = req.body;
+  let tournament;
+  const idParam = req.params.id;
+  if (/^\d+$/.test(idParam)) {
+    tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(parseInt(idParam));
+  } else {
+    tournament = db.prepare('SELECT * FROM tournaments WHERE code = ?').get(idParam);
+  }
+  if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
+  if (!tournament.admin_password_hash) return res.status(400).json({ error: 'No password set' });
+  if (!bcrypt.compareSync(password, tournament.admin_password_hash)) return res.status(401).json({ error: 'Invalid password' });
+  const token = generateToken(tournament.id);
+  res.json({ token, id: tournament.id });
+});
+
+// --- TOURNAMENT MANAGEMENT ---
+
+app.post('/api/tournaments', (req, res) => {
+  const { title, description, admin_password } = req.body;
+  if (!title || !title.trim()) return res.status(400).json({ error: 'Title is required' });
+  const passwordHash = admin_password ? bcrypt.hashSync(admin_password, 10) : null;
+  let code;
+  do { code = generateCode(); } while (db.prepare('SELECT id FROM tournaments WHERE code = ?').get(code));
+  const result = db.prepare('INSERT INTO tournaments (title, description, admin_password_hash, code) VALUES (?, ?, ?, ?)').run(title.trim(), (description || '').trim(), passwordHash, code);
+  const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(result.lastInsertRowid);
+  res.json(sanitizeTournament(tournament, true));
+});
+
+app.post('/api/tournaments/:id/start', requireAdmin, (req, res) => {
+  let tournament;
+  const idParam = req.params.id;
+  if (/^\d+$/.test(idParam)) {
+    tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(parseInt(idParam));
+  } else {
+    tournament = db.prepare('SELECT * FROM tournaments WHERE code = ?').get(idParam);
+  }
+  if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
+  if (tournament.status !== 'draft') return res.status(400).json({ error: 'Tournament already started' });
+  const entries = db.prepare('SELECT * FROM entries WHERE tournament_id = ? ORDER BY seed').all(tournament.id);
+  if (entries.length < 2) return res.status(400).json({ error: 'Need at least 2 entries to start' });
+  const size = nextPowerOf2(entries.length);
+  const numRounds = Math.log2(size);
+  const seeding = getSeedingOrder(size);
+  const insertMatch = db.prepare('INSERT INTO matches (tournament_id, round, position, entry1_id, entry2_id) VALUES (?, ?, ?, ?, ?)');
+  for (let pos = 0; pos < size / 2; pos++) {
+    const seed1 = seeding[pos * 2];
+    const seed2 = seeding[pos * 2 + 1];
+    const e1 = seed1 <= entries.length ? entries[seed1 - 1].id : null;
+    const e2 = seed2 <= entries.length ? entries[seed2 - 1].id : null;
+    insertMatch.run(tournament.id, 0, pos, e1, e2);
+  }
+  for (let round = 1; round <= numRounds; round++) {
+    const matchesInRound = size / Math.pow(2, round + 1);
+    for (let pos = 0; pos < matchesInRound; pos++) {
+      insertMatch.run(tournament.id, round, pos, null, null);
+    }
+  }
+  db.prepare('UPDATE tournaments SET status = ? WHERE id = ?').run('active', tournament.id);
+  tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(tournament.id);
+  const updatedEntries = db.prepare('SELECT * FROM entries WHERE tournament_id = ? ORDER BY seed').all(tournament.id);
+  const matches = db.prepare('SELECT * FROM matches WHERE tournament_id = ? ORDER BY round, position').all(tournament.id);
+  res.json({ ...sanitizeTournament(tournament, true), entries: updatedEntries, matches });
+});
+
+app.post('/api/tournaments/:id/entries', requireAdmin, (req, res) => {
+  let tournament;
+  const idParam = req.params.id;
+  if (/^\d+$/.test(idParam)) {
+    tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(parseInt(idParam));
+  } else {
+    tournament = db.prepare('SELECT * FROM tournaments WHERE code = ?').get(idParam);
+  }
+  if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
+  if (tournament.status !== 'draft') return res.status(400).json({ error: 'Cannot add entries after tournament has started' });
+  const { name, youtube_url } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
+  const count = db.prepare('SELECT COUNT(*) as count FROM entries WHERE tournament_id = ?').get(tournament.id).count;
+  const result = db.prepare('INSERT INTO entries (tournament_id, name, youtube_url, seed) VALUES (?, ?, ?, ?)').run(tournament.id, name.trim(), youtube_url || '', count + 1);
+  const entry = db.prepare('SELECT * FROM entries WHERE id = ?').get(result.lastInsertRowid);
+  res.json(entry);
+});
+
+app.delete('/api/tournaments/:id/entries/:entryId', requireAdmin, (req, res) => {
+  let tournament;
+  const idParam = req.params.id;
+  if (/^\d+$/.test(idParam)) {
+    tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(parseInt(idParam));
+  } else {
+    tournament = db.prepare('SELECT * FROM tournaments WHERE code = ?').get(idParam);
+  }
+  if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
+  if (tournament.status !== 'draft') return res.status(400).json({ error: 'Cannot remove entries after tournament has started' });
+  const entry = db.prepare('SELECT * FROM entries WHERE id = ? AND tournament_id = ?').get(req.params.entryId, tournament.id);
+  if (!entry) return res.status(404).json({ error: 'Entry not found' });
+  db.prepare('DELETE FROM entries WHERE id = ?').run(entry.id);
+  const entries = db.prepare('SELECT * FROM entries WHERE tournament_id = ? ORDER BY seed').all(tournament.id);
+  const updateSeed = db.prepare('UPDATE entries SET seed = ? WHERE id = ?');
+  db.transaction((ents) => { for (let i = 0; i < ents.length; i++) updateSeed.run(i + 1, ents[i].id); })(entries);
+  res.json({ success: true });
+});
+
+app.put('/api/tournaments/:id/entries/reorder', requireAdmin, (req, res) => {
+  let tournament;
+  const idParam = req.params.id;
+  if (/^\d+$/.test(idParam)) {
+    tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(parseInt(idParam));
+  } else {
+    tournament = db.prepare('SELECT * FROM tournaments WHERE code = ?').get(idParam);
+  }
+  if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
+  if (tournament.status !== 'draft') return res.status(400).json({ error: 'Cannot reorder entries after tournament has started' });
+  const { entries: entryOrder } = req.body;
+  if (!Array.isArray(entryOrder)) return res.status(400).json({ error: 'entries must be an array' });
+  const updateSeed = db.prepare('UPDATE entries SET seed = ? WHERE id = ?');
+  db.transaction((order) => { for (let i = 0; i < order.length; i++) updateSeed.run(i + 1, order[i].id); })(entryOrder);
+  const updated = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(tournament.id);
+  const updatedEntries = db.prepare('SELECT * FROM entries WHERE tournament_id = ? ORDER BY seed').all(tournament.id);
+  res.json({ ...sanitizeTournament(updated, true), entries: updatedEntries, matches: [] });
+});
+
+app.put('/api/tournaments/:id/entries/:entryId', requireAdmin, (req, res) => {
+  let tournament;
+  const idParam = req.params.id;
+  if (/^\d+$/.test(idParam)) {
+    tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(parseInt(idParam));
+  } else {
+    tournament = db.prepare('SELECT * FROM tournaments WHERE code = ?').get(idParam);
+  }
+  if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
+  const entry = db.prepare('SELECT * FROM entries WHERE id = ? AND tournament_id = ?').get(req.params.entryId, tournament.id);
+  if (!entry) return res.status(404).json({ error: 'Entry not found' });
+  const { name, youtube_url } = req.body;
+  if (name !== undefined) db.prepare('UPDATE entries SET name = ? WHERE id = ?').run(name.trim(), entry.id);
+  if (youtube_url !== undefined) db.prepare('UPDATE entries SET youtube_url = ? WHERE id = ?').run(youtube_url || '', entry.id);
+  const updatedEntry = db.prepare('SELECT * FROM entries WHERE id = ?').get(entry.id);
+  res.json(updatedEntry);
+});
+
+// --- VOTING ---
+
+app.post('/api/matches/:id/vote', requireAdmin, (req, res) => {
+  const match = db.prepare('SELECT * FROM matches WHERE id = ?').get(req.params.id);
+  if (!match) return res.status(404).json({ error: 'Match not found' });
+  const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(match.tournament_id);
+  const { winner_id } = req.body;
+  if (!winner_id) return res.status(400).json({ error: 'winner_id is required' });
+  if (winner_id !== match.entry1_id && winner_id !== match.entry2_id) return res.status(400).json({ error: 'winner_id must be one of the match entries' });
+  if (match.winner_id !== null) return res.status(400).json({ error: 'Match already decided' });
+  db.prepare('UPDATE matches SET winner_id = ? WHERE id = ?').run(winner_id, match.id);
+  propagateSlot(match.id, winner_id, match.tournament_id);
+  const totalMatches = db.prepare('SELECT COUNT(*) as count FROM matches WHERE tournament_id = ?').get(tournament.id).count;
+  const decidedMatches = db.prepare('SELECT COUNT(*) as count FROM matches WHERE tournament_id = ? AND winner_id IS NOT NULL').get(tournament.id).count;
+  if (decidedMatches === totalMatches) {
+    db.prepare('UPDATE tournaments SET status = ? WHERE id = ?').run('completed', tournament.id);
+  }
+  const updatedTournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(tournament.id);
+  const entries = db.prepare('SELECT * FROM entries WHERE tournament_id = ? ORDER BY seed').all(tournament.id);
+  const matches = addRevealFlags(db.prepare('SELECT * FROM matches WHERE tournament_id = ? ORDER BY round, position').all(tournament.id), updatedTournament.revealed_match_count, true);
+  res.json({ ...sanitizeTournament(updatedTournament, true), entries, matches });
+});
+
+// --- REVEAL ENDPOINTS ---
+
+app.post('/api/tournaments/:id/reveal', requireAdmin, (req, res) => {
+  let tournament;
+  const idParam = req.params.id;
+  if (/^\d+$/.test(idParam)) {
+    tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(parseInt(idParam));
+  } else {
+    tournament = db.prepare('SELECT * FROM tournaments WHERE code = ?').get(idParam);
+  }
+  if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
+  if (tournament.status === 'draft') return res.status(400).json({ error: 'Start the tournament first' });
+  const totalMatches = db.prepare('SELECT COUNT(*) as count FROM matches WHERE tournament_id = ?').get(tournament.id).count;
+  if (tournament.revealed_match_count >= totalMatches) return res.status(400).json({ error: 'All matches already revealed' });
+  if (tournament.revealed_match_count > 0) {
+    const allMatches = db.prepare('SELECT * FROM matches WHERE tournament_id = ? ORDER BY round, position').all(tournament.id);
+    const lastRevealed = allMatches[tournament.revealed_match_count - 1];
+    if (lastRevealed && lastRevealed.winner_id === null && lastRevealed.entry1_id !== null && lastRevealed.entry2_id !== null) {
+      return res.status(400).json({ error: 'Pick a winner for the current match before revealing the next one' });
+    }
+  }
+  const newCount = tournament.revealed_match_count + 1;
+  db.prepare('UPDATE tournaments SET revealed_match_count = ? WHERE id = ?').run(newCount, tournament.id);
+  if (tournament.reveal_mode === 'timed' && tournament.reveal_interval_hours) {
+    const nextAt = tournament.next_reveal_at || new Date(Date.now() + tournament.reveal_interval_hours * 60 * 60 * 1000).toISOString().replace('Z', '');
+    db.prepare('UPDATE tournaments SET next_reveal_at = ? WHERE id = ?').run(nextAt, tournament.id);
+  }
+  tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(tournament.id);
+  const entries = db.prepare('SELECT * FROM entries WHERE tournament_id = ? ORDER BY seed').all(tournament.id);
+  const matches = addRevealFlags(db.prepare('SELECT * FROM matches WHERE tournament_id = ? ORDER BY round, position').all(tournament.id), tournament.revealed_match_count, true);
+  res.json({ ...sanitizeTournament(tournament, true), entries, matches });
+});
+
+app.post('/api/tournaments/:id/reveal-all', requireAdmin, (req, res) => {
+  let tournament;
+  const idParam = req.params.id;
+  if (/^\d+$/.test(idParam)) {
+    tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(parseInt(idParam));
+  } else {
+    tournament = db.prepare('SELECT * FROM tournaments WHERE code = ?').get(idParam);
+  }
+  if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
+  if (tournament.status === 'draft') return res.status(400).json({ error: 'Start the tournament first' });
+  const totalMatches = db.prepare('SELECT COUNT(*) as count FROM matches WHERE tournament_id = ?').get(tournament.id).count;
+  db.prepare('UPDATE tournaments SET revealed_match_count = ?, next_reveal_at = NULL WHERE id = ?').run(totalMatches, tournament.id);
+  tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(tournament.id);
+  const entries = db.prepare('SELECT * FROM entries WHERE tournament_id = ? ORDER BY seed').all(tournament.id);
+  const matches = addRevealFlags(db.prepare('SELECT * FROM matches WHERE tournament_id = ? ORDER BY round, position').all(tournament.id), tournament.revealed_match_count, true);
+  res.json({ ...sanitizeTournament(tournament, true), entries, matches });
+});
+
+app.post('/api/tournaments/:id/reset-reveals', requireAdmin, (req, res) => {
+  let tournament;
+  const idParam = req.params.id;
+  if (/^\d+$/.test(idParam)) {
+    tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(parseInt(idParam));
+  } else {
+    tournament = db.prepare('SELECT * FROM tournaments WHERE code = ?').get(idParam);
+  }
+  if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
+  db.prepare('UPDATE tournaments SET revealed_match_count = 0, next_reveal_at = NULL WHERE id = ?').run(tournament.id);
+  tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(tournament.id);
+  const entries = db.prepare('SELECT * FROM entries WHERE tournament_id = ? ORDER BY seed').all(tournament.id);
+  const matches = addRevealFlags(db.prepare('SELECT * FROM matches WHERE tournament_id = ? ORDER BY round, position').all(tournament.id), 0, true);
+  res.json({ ...sanitizeTournament(tournament, true), entries, matches });
+});
+
+app.put('/api/tournaments/:id/reveal-settings', requireAdmin, (req, res) => {
+  let tournament;
+  const idParam = req.params.id;
+  if (/^\d+$/.test(idParam)) {
+    tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(parseInt(idParam));
+  } else {
+    tournament = db.prepare('SELECT * FROM tournaments WHERE code = ?').get(idParam);
+  }
+  if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
+  const { reveal_mode, reveal_interval_hours, next_reveal_at } = req.body;
+  if (reveal_mode && !['manual', 'timed'].includes(reveal_mode)) return res.status(400).json({ error: 'Invalid reveal_mode' });
+  const interval = parseInt(reveal_interval_hours) || 24;
+  let nextAt = null;
+  if (reveal_mode === 'timed') {
+    if (next_reveal_at) {
+      nextAt = next_reveal_at;
+    } else {
+      nextAt = new Date(Date.now() + interval * 60 * 60 * 1000).toISOString().replace('Z', '');
+    }
+  }
+  db.prepare('UPDATE tournaments SET reveal_mode = ?, reveal_interval_hours = ?, next_reveal_at = ? WHERE id = ?').run(
+    reveal_mode || tournament.reveal_mode, interval, nextAt, tournament.id
+  );
+  tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(tournament.id);
+  const entries = db.prepare('SELECT * FROM entries WHERE tournament_id = ? ORDER BY seed').all(tournament.id);
+  const matches = addRevealFlags(db.prepare('SELECT * FROM matches WHERE tournament_id = ? ORDER BY round, position').all(tournament.id), tournament.revealed_match_count, true);
+  res.json({ ...sanitizeTournament(tournament, true), entries, matches });
+});
+
+// --- DELETE ---
+
+app.delete('/api/tournaments/:id', requireAdmin, (req, res) => {
+  let tournament;
+  const idParam = req.params.id;
+  if (/^\d+$/.test(idParam)) {
+    tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(parseInt(idParam));
+  } else {
+    tournament = db.prepare('SELECT * FROM tournaments WHERE code = ?').get(idParam);
+  }
+  if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
+  db.prepare('DELETE FROM matches WHERE tournament_id = ?').run(tournament.id);
+  db.prepare('DELETE FROM entries WHERE tournament_id = ?').run(tournament.id);
+  db.prepare('DELETE FROM tournaments WHERE id = ?').run(tournament.id);
+  res.json({ success: true });
 });
 
 app.get('*', (req, res) => {

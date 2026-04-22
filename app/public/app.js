@@ -613,14 +613,19 @@ function renderRevealPanel(data, totalMatches, revealedMatchCount, canRevealNext
       ${revealedMatchCount > 0 ? `<button class="btn btn-danger btn-small" onclick="resetReveals(${data.id})">Hide All</button>` : ''}
     </div>
     ${!canRevealNextMatch && canRevealNext ? '<div style="font-size:13px;color:var(--accent);margin-bottom:8px;">Pick a winner for the current match before revealing the next one.</div>' : ''}
-    <div class="reveal-timer">
+<div class="reveal-timer">
       <label class="reveal-mode-label">Auto-reveal:</label>
       <select id="reveal-mode-select" onchange="updateRevealMode(${data.id})">
         <option value="manual" ${data.reveal_mode === 'manual' ? 'selected' : ''}>Manual (click to reveal)</option>
-        <option value="timed" ${data.reveal_mode === 'timed' ? 'selected' : ''}>Daily at <input type="time" id="reveal-time" value="${data.next_reveal_at ? new Date(data.next_reveal_at + 'Z').toTimeString().slice(0,5) : '12:00'}" onchange="updateRevealMode(${data.id})"></option>
+        <option value="timed" ${data.reveal_mode === 'timed' ? 'selected' : ''}>Daily at set time</option>
       </select>
-      ${data.next_reveal_at ? `<div class="reveal-next">Next auto-reveal: ${new Date(data.next_reveal_at + 'Z').toLocaleString()}</div>` : ''}
-</div>
+      ${data.reveal_mode === 'timed' ? `
+        <div style="display:inline-flex;align-items:center;gap:8px;margin-top:4px;">
+          <input type="time" id="reveal-time" value="${data.next_reveal_at ? localTimeFromUTC(data.next_reveal_at) : '12:00'}">
+          <button class="btn btn-secondary btn-small" onclick="updateRevealTime(${data.id})">Set</button>
+        </div>` : ''}
+      ${data.next_reveal_at ? `<div class="reveal-next">Next auto-reveal: ${formatDate(data.next_reveal_at)}</div>` : ''}
+    </div>
     </div>`;
 }
 
@@ -827,17 +832,57 @@ async function resetReveals(id) {
   } catch (e) { showToast(e.message, 'error'); }
 }
 
+function formatDate(s) {
+  if (!s) return '';
+  const d = s.endsWith('Z') ? new Date(s) : new Date(s + 'Z');
+  return isNaN(d) ? s : d.toLocaleString();
+}
+
+function localTimeFromUTC(utcStr) {
+  if (!utcStr) return '12:00';
+  const d = utcStr.endsWith('Z') ? new Date(utcStr) : new Date(utcStr + 'Z');
+  if (isNaN(d)) return '12:00';
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return hh + ':' + mm;
+}
+
+function nextOccurrenceUTC(timeStr) {
+  const [h, m] = timeStr.split(':').map(Number);
+  const now = new Date();
+  const target = new Date(now);
+  target.setHours(h, m, 0, 0);
+  if (target <= now) target.setDate(target.getDate() + 1);
+  return target.toISOString();
+}
+
 async function updateRevealMode(id) {
   const modeEl = document.getElementById('reveal-mode-select');
-  const hoursEl = document.getElementById('reveal-hours');
-  const timeEl = document.getElementById('reveal-time');
   const reveal_mode = modeEl.value === 'timed' ? 'timed' : 'manual';
-  const reveal_interval_hours = parseInt(hoursEl?.value) || 24;
-  const reveal_time = timeEl?.value || '12:00';
+  let body = { reveal_mode, reveal_interval_hours: 24 };
+  if (reveal_mode === 'timed') {
+    const timeEl = document.getElementById('reveal-time');
+    const timeVal = timeEl?.value || '12:00';
+    body.reveal_time = timeVal;
+    body.next_reveal_at = nextOccurrenceUTC(timeVal);
+  }
   try {
-    const data = await apiAuth('PUT', `/tournaments/${id}/reveal-settings`, { reveal_mode, reveal_interval_hours, reveal_time }, id);
+    const data = await apiAuth('PUT', `/tournaments/${id}/reveal-settings`, body, id);
     currentTournament = data;
     renderBracket(data.id);
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function updateRevealTime(id) {
+  const timeEl = document.getElementById('reveal-time');
+  if (!timeEl || !timeEl.value) { showToast('Pick a time first', 'error'); return; }
+  const timeVal = timeEl.value;
+  const nextAt = nextOccurrenceUTC(timeVal);
+  try {
+    const data = await apiAuth('PUT', `/tournaments/${id}/reveal-settings`, { reveal_mode: 'timed', reveal_interval_hours: 24, reveal_time: timeVal, next_reveal_at: nextAt }, id);
+    currentTournament = data;
+    renderBracket(data.id);
+    showToast('Auto-reveal set to ' + new Date(nextAt).toLocaleString(), 'success');
   } catch (e) { showToast(e.message, 'error'); }
 }
 
