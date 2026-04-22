@@ -175,3 +175,16 @@ server {
 ## License
 
 MIT
+
+## Disclaimer
+
+This project was fully coded using AI (opencode with GLM-5). No manual code was written — the entire application, from backend to frontend to Docker configuration, was generated through conversational AI prompts.
+
+### Built With
+
+- **Backend:** Node.js, Express, better-sqlite3, bcryptjs
+- **Frontend:** Vanilla JavaScript (no framework), YouTube IFrame API
+- **Database:** SQLite via better-sqlite3
+- **Auth:** HMAC-SHA256 session tokens
+- **Deployment:** Docker, Docker Compose
+- **AI Tools:** opencode + GLM-5
