@@ -26,7 +26,20 @@ function createYTPlayer(playerId, videoId, autoPlay) {
         if (pendingPlay[playerId]) {
           try { ytPlayers[playerId].playVideo(); } catch (e) {}
           delete pendingPlay[playerId];
-        }
+}
+
+function exportBracket() {
+  const el = document.getElementById('bracket-container');
+  if (!el) { showToast('No bracket to export', 'error'); return; }
+  showToast('Generating image...', 'info');
+  html2canvas(el, { backgroundColor: '#0a0a0f', scale: 2 }).then(canvas => {
+    const link = document.createElement('a');
+    link.download = (currentTournament?.title || 'bracket').replace(/[^a-zA-Z0-9]/g, '_') + '.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    showToast('Image saved!', 'success');
+  }).catch(() => { showToast('Export failed', 'error'); });
+}
       },
       onStateChange: (event) => {
         if (event.data === YT.PlayerState.PLAYING) { setBtnState(playerId, 'playing'); updateProgress(playerId); }
@@ -352,6 +365,16 @@ function renderTournamentByData(data) {
                   <input type="text" id="inp-entry-youtube" placeholder="https://youtube.com/watch?v=..."></div>
                 <button class="btn btn-primary" onclick="addEntry(${id})">Add Entry</button>
               </div>
+              <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px;">
+                <details class="faq-item">
+                  <summary class="faq-question">Bulk Import</summary>
+                  <div class="faq-answer" style="padding:12px 16px;">
+                    <p style="margin-bottom:8px;">One entry per line. Format: <code>Song Name | YouTube URL</code> (URL is optional)</p>
+                    <textarea id="inp-bulk-entries" rows="6" placeholder="Artist - Song Title&#10;Another Song | https://youtube.com/watch?v=...&#10;Third Track"></textarea>
+                    <button class="btn btn-secondary" style="margin-top:8px;" onclick="bulkImport(${id})">Import All</button>
+                  </div>
+                </details>
+              </div>
             </div>
             <div class="panel">
               <div class="panel-title">&#9881; Actions</div>
@@ -396,11 +419,42 @@ async function addEntry(id) {
   const name = document.getElementById('inp-entry-name').value.trim();
   const youtube = document.getElementById('inp-entry-youtube').value.trim();
   if (!name) { showToast('Entry name is required', 'error'); return; }
+  if (currentTournament?.entries?.some(e => e.name.toLowerCase() === name.toLowerCase())) {
+    showToast('"' + name + '" already exists', 'error'); return;
+  }
   try {
     await apiAuth('POST', `/tournaments/${id}/entries`, { name, youtube_url: youtube }, id);
     document.getElementById('inp-entry-name').value = '';
     document.getElementById('inp-entry-youtube').value = '';
     document.getElementById('inp-entry-name').focus();
+    renderTournament(id);
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function bulkImport(id) {
+  const text = document.getElementById('inp-bulk-entries').value.trim();
+  if (!text) { showToast('Paste entries to import', 'error'); return; }
+  const lines = text.split('\n').filter(l => l.trim());
+  const entries = [];
+  const existingNames = new Set((currentTournament?.entries || []).map(e => e.name.toLowerCase()));
+  const duplicateNames = [];
+  for (const line of lines) {
+    const parts = line.split('|');
+    const name = parts[0].trim();
+    const youtube_url = (parts[1] || '').trim();
+    if (!name) continue;
+    if (existingNames.has(name.toLowerCase())) { duplicateNames.push(name); continue; }
+    entries.push({ name, youtube_url });
+    existingNames.add(name.toLowerCase());
+  }
+  if (duplicateNames.length > 0) {
+    showToast('Skipped duplicates: ' + duplicateNames.join(', '), 'error');
+  }
+  if (entries.length === 0) { showToast('No new entries to import', 'error'); return; }
+  try {
+    const result = await apiAuth('POST', `/tournaments/${id}/entries/bulk`, { entries }, id);
+    document.getElementById('inp-bulk-entries').value = '';
+    showToast('Added ' + result.added + ' entries', 'success');
     renderTournament(id);
   } catch (e) { showToast(e.message, 'error'); }
 }
@@ -466,6 +520,16 @@ async function deleteTournament(id) {
   if (!confirm('Delete this tournament permanently?')) return;
   try { await apiAuth('DELETE', `/tournaments/${id}`, null, id); navigate('/'); }
   catch (e) { showToast(e.message, 'error'); }
+}
+
+async function restartTournament(id) {
+  if (!confirm('Restart this bracket? All match results will be cleared. Entries will be kept.')) return;
+  try {
+    const data = await apiAuth('POST', `/tournaments/${id}/restart`, null, id);
+    currentTournament = data;
+    renderTournamentByData(data);
+    showToast('Bracket restarted — entries kept', 'success');
+  } catch (e) { showToast(e.message, 'error'); }
 }
 
 async function shuffleEntries(id) {
@@ -577,6 +641,8 @@ function renderBracketByData(data) {
         <div class="action-bar-right" style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn btn-share-wa btn-small" onclick="shareWhatsApp('${code}')">&#128172; WhatsApp</button>
           <button class="btn btn-share-copy btn-small" onclick="copyLink('${code}')">&#128203; Copy Link</button>
+          <button class="btn btn-secondary btn-small" onclick="exportBracket()">&#128247; Export</button>
+          ${isAdm ? '<button class="btn btn-secondary btn-small" onclick="restartTournament(' + id + ')">Restart</button>' : ''}
           ${data.has_password && isAdm ? '<button class="btn btn-secondary btn-small" onclick="doAdminLogout(' + id + ')">Logout</button>' : ''}
           ${isAdm ? '<button class="btn btn-danger btn-small" onclick="deleteTournament(' + id + ')">Delete</button>' : ''}
         </div>
