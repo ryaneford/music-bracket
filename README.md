@@ -140,12 +140,12 @@ Yes — click the **Logout** button in the bracket header. You'll be returned to
 
 ## Reverse Proxy
 
-To use with a custom domain (e.g. `deathmatch.buis2.net`), add a reverse proxy like Caddy or Nginx:
+To use with a custom domain (e.g. `brackets.example.com`), add a reverse proxy like Caddy or Nginx:
 
 **Caddy example:**
 
 ```
-deathmatch.buis2.net {
+brackets.example.com {
     reverse_proxy localhost:3211
 }
 ```
@@ -155,7 +155,7 @@ deathmatch.buis2.net {
 ```nginx
 server {
     listen 443 ssl;
-    server_name deathmatch.buis2.net;
+    server_name brackets.example.com;
 
     location / {
         proxy_pass http://127.0.0.1:3211;
