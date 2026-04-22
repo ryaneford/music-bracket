@@ -4,6 +4,16 @@ A self-hosted single-elimination bracket tournament app for music — run "Best 
 
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
+## Screenshots
+
+**Home page — Create or join a tournament:**
+
+![Home page](screenshots/home.png)
+
+**Bracket view — Match reveals with audio playback:**
+
+![Bracket view](screenshots/bracket.png)
+
 ## Features
 
 - **Single-elimination brackets** — 4, 8, 16, or 32 entries with sequential seeding
