@@ -1,0 +1,15 @@
+{
+  "name": "music-bracket",
+  "version": "1.0.0",
+  "description": "Music tournament bracket creator with YouTube integration",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.0"
+  }
+}

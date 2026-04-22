@@ -1,0 +1,9 @@
+services:
+  music-bracket:
+    build: ./app
+    container_name: music-bracket
+    ports:
+      - "3211:3000"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
