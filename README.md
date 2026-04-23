@@ -22,7 +22,11 @@ A self-hosted single-elimination bracket tournament app for music — run "Best 
 - **Auto-reveal timer** — set a daily time (e.g. 12:00 PM) and matches reveal automatically on schedule
 - **Admin password protection** — restrict voting, reveals, and editing to authenticated admins
 - **Share links** — WhatsApp and copy-link buttons with pre-written messages
+- **Link previews** — Open Graph meta tags so shared links show the tournament name
 - **Edit entries** — admins can rename songs and update YouTube URLs at any time
+- **Bulk import** — paste multiple songs at once (`Name | YouTube URL` per line)
+- **Bracket restart** — reset all matches while keeping entries in draft mode
+- **PNG export** — export the bracket as a screenshot image
 - **No accounts needed** — anyone with the link can view; password is optional
 
 ## Quick Start

@@ -499,6 +499,28 @@ app.put('/api/tournaments/:id/entries/reorder', requireAdmin, (req, res) => {
   res.json({ ...sanitizeTournament(updated, true), entries: updatedEntries, matches: [] });
 });
 
+app.post('/api/tournaments/:id/shuffle', requireAdmin, (req, res) => {
+  let tournament;
+  const idParam = req.params.id;
+  if (/^\d+$/.test(idParam)) {
+    tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(parseInt(idParam));
+  } else {
+    tournament = db.prepare('SELECT * FROM tournaments WHERE code = ?').get(idParam);
+  }
+  if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
+  if (tournament.status !== 'draft') return res.status(400).json({ error: 'Cannot shuffle after tournament has started' });
+  const entries = db.prepare('SELECT * FROM entries WHERE tournament_id = ? ORDER BY seed').all(tournament.id);
+  for (let i = entries.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [entries[i], entries[j]] = [entries[j], entries[i]];
+  }
+  const updateSeed = db.prepare('UPDATE entries SET seed = ? WHERE id = ?');
+  db.transaction((ents) => { for (let i = 0; i < ents.length; i++) updateSeed.run(i + 1, ents[i].id); })(entries);
+  const updated = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(tournament.id);
+  const updatedEntries = db.prepare('SELECT * FROM entries WHERE tournament_id = ? ORDER BY seed').all(tournament.id);
+  res.json({ ...sanitizeTournament(updated, true), entries: updatedEntries, matches: [] });
+});
+
 app.put('/api/tournaments/:id/entries/:entryId', requireAdmin, (req, res) => {
   let tournament;
   const idParam = req.params.id;
@@ -669,8 +691,34 @@ app.post('/api/tournaments/:id/restart', requireAdmin, (req, res) => {
   res.json({ ...sanitizeTournament(tournament, true), entries, matches: [] });
 });
 
+const indexHtml = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+
+function buildOgHtml(tournament) {
+  const title = tournament.title || 'Music Bracket';
+  const desc = tournament.description || 'Vote for the best song in a head-to-head music bracket tournament!';
+  const url = `https://deathmatch.buis2.net/${tournament.code}`;
+  const ogBlock = `  <!-- OG-PREVIEW-START -->
+  <meta property="og:title" content="${title.replace(/"/g, '&quot;')}">
+  <meta property="og:description" content="${desc.replace(/"/g, '&quot;')}">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="${url}">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="${title.replace(/"/g, '&quot;')}">
+  <meta name="twitter:description" content="${desc.replace(/"/g, '&quot;')}">
+  <!-- OG-PREVIEW-END -->`;
+  return indexHtml.replace(/  <!-- OG-PREVIEW-START -->[\s\S]*?<!-- OG-PREVIEW-END -->/, ogBlock).replace(/<title>.*?<\/title>/, `<title>${title.replace(/</g, '&lt;')}</title>`);
+}
+
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  const codeMatch = req.path.match(/^\/([a-zA-Z0-9]{6})$/);
+  if (codeMatch) {
+    const tournament = db.prepare('SELECT * FROM tournaments WHERE code = ?').get(codeMatch[1]);
+    if (tournament) {
+      processTimedReveal(tournament);
+      return res.send(buildOgHtml(tournament));
+    }
+  }
+  res.send(indexHtml);
 });
 
 app.listen(PORT, '0.0.0.0', () => {

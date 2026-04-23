@@ -997,15 +997,16 @@ const faqContent = `
   </details>`;
 
 function showFaq() {
-  const app = document.getElementById('app');
-  app.innerHTML = `
-    <div class="modal-overlay" onclick="if(event.target===this)this.remove()">
-      <div class="modal">
-        <div class="modal-header">
-          <div class="modal-title">How It Works</div>
-          <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">&#10005;</button>
-        </div>
-        <div class="modal-body">${faqContent}</div>
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.onclick = (ev) => { if (ev.target === overlay) overlay.remove(); };
+  overlay.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">How It Works</div>
+        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">&#10005;</button>
       </div>
+      <div class="modal-body">${faqContent}</div>
     </div>`;
+  document.body.appendChild(overlay);
 }
