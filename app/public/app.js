@@ -239,9 +239,6 @@ function renderHome() {
           <input type="text" id="inp-title" placeholder="e.g. Best Smashing Pumpkins B-Side" autofocus></div>
         <div class="form-group"><label>Description (optional)</label>
           <textarea id="inp-desc" placeholder="Describe what this bracket is about..." rows="2"></textarea></div>
-        <div class="form-group"><label>Admin Password (optional)</label>
-          <input type="password" id="inp-password" placeholder="Leave empty for open access">
-          <div class="form-hint">Set a password to restrict who can vote and reveal matches. Without it, anyone can vote.</div></div>
         <div class="btn-row"><button class="btn btn-primary" onclick="createTournament()">Create Tournament</button></div>
         <div style="text-align:center;margin-top:24px;padding-top:24px;border-top:1px solid var(--border);">
           <p style="color:var(--text-dim);font-size:14px;margin-bottom:12px;">Have a room code?</p>
@@ -289,13 +286,39 @@ function joinByCode() {
 async function createTournament() {
   const title = document.getElementById('inp-title').value.trim();
   const desc = document.getElementById('inp-desc').value.trim();
-  const password = document.getElementById('inp-password').value;
   if (!title) { showToast('Title is required', 'error'); return; }
   try {
-    const t = await api('POST', '/tournaments', { title, description: desc, admin_password: password || undefined });
-    if (password) setAdminToken(t.id, null);
-    navigate(`/tournament/${t.id}`);
+    const t = await api('POST', '/tournaments', { title, description: desc });
+    if (t.token) setAdminToken(t.id, t.token);
+    showPasswordModal(t.code, t.password);
+    currentTournament = t;
   } catch (e) { showToast(e.message, 'error'); }
+}
+
+function showPasswordModal(code, password) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.onclick = (ev) => { if (ev.target === overlay) { overlay.remove(); navigate('/' + code); } };
+  const link = window.location.origin + '/' + code;
+  overlay.innerHTML = `<div class="modal" style="max-width:480px;">
+    <div class="modal-header"><div class="modal-title">Bracket Created!</div></div>
+    <div class="modal-body">
+      <p style="color:var(--text-dim);margin-bottom:16px;">Save this password — it's the only way to vote and manage your bracket. Share it with your group so everyone can participate.</p>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px;">
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;">PASSWORD</div>
+        <div style="font-size:20px;font-weight:700;font-family:monospace;letter-spacing:1px;word-break:break-all;">${password}</div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px;">
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;">SHARE LINK</div>
+        <div style="font-size:14px;font-family:monospace;word-break:break-all;">${link}</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="navigator.clipboard.writeText('${link}  Password: ${password}').then(()=>{showToast('Copied link + password!','success');this.closest('.modal-overlay').remove();navigate('/${code}');})">Copy Link & Password</button>
+        <button class="btn btn-secondary" onclick="navigator.clipboard.writeText('${password}').then(()=>{showToast('Password copied!','success');this.closest('.modal-overlay').remove();navigate('/${code}');})">Copy Password Only</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
 }
 
 // --- TOURNAMENT SETUP ---
@@ -324,7 +347,7 @@ function renderTournamentByData(data) {
       <div class="action-bar">
         <div class="action-bar-left">
           <span class="badge badge-${data.status}">${data.status}</span>
-          ${data.has_password ? (isAdm ? '<span class="badge badge-admin">&#128274; Admin</span>' : '<span class="badge badge-locked">&#128274; Read Only</span>') : ''}
+          ${data.has_password ? (isAdm ? '<span class="badge badge-admin">&#128274; Logged In</span>' : '<span class="badge badge-locked">&#128274; Enter Password to Vote</span>') : ''}
         </div>
         <div class="action-bar-right">
           ${data.has_password && isAdm ? '<button class="btn btn-secondary btn-small" onclick="doAdminLogout(' + id + ')">Logout</button>' : ''}
@@ -388,13 +411,11 @@ function renderTournamentByData(data) {
                 <button class="btn btn-secondary" onclick="shuffleEntries(${id})" title="Randomize seed order">&#128256; Shuffle</button>
               </div>` : ''}
               <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">
-                <div class="form-group"><label>Admin Password (optional)</label>
-                  <input type="password" id="inp-setup-password" placeholder="Set password to restrict voting" value="">
-                  <div class="form-hint">Leave empty to allow anyone to vote</div></div>
+                <div style="font-size:13px;color:var(--text-dim);">&#128274; Password-protected — share the password from the creation screen so your group can vote</div>
               </div>
             </div>
           </div>
-        </div>` : `<div class="panel"><p>A password is required to manage this tournament. <button class="btn btn-secondary btn-small" onclick="showAdminLogin(${id})">Admin Login</button></p></div>`}
+        </div>` : `<div class="panel"><p>A password is required to manage this tournament. <button class="btn btn-secondary btn-small" onclick="showAdminLogin(${id})">Enter Password</button></p></div>`}
       `}
     </div>`;
   const nameInput = document.getElementById('inp-entry-name');
@@ -497,13 +518,7 @@ async function doEditEntry(tournamentId, entryId) {
 }
 
 async function startTournament(id) {
-  const pwField = document.getElementById('inp-setup-password');
-  const password = pwField ? pwField.value : '';
   try {
-    if (password) {
-      const pwData = await apiAuth('PUT', `/tournaments/${id}/password`, { admin_password: password }, id);
-      if (pwData.token) setAdminToken(id, pwData.token);
-    }
     await apiAuth('POST', `/tournaments/${id}/start`, null, id);
     const data = await loadTournament(id);
     navigate('/' + data.code);
@@ -542,9 +557,10 @@ function showAdminLogin(id) {
   overlay.className = 'modal-overlay';
   overlay.onclick = (ev) => { if (ev.target === overlay) closeModal(); };
   overlay.innerHTML = `<div class="modal">
-    <div class="modal-header"><div class="modal-title">&#128274; Admin Login</div><button class="modal-close" onclick="closeModal()">&#10005;</button></div>
+    <div class="modal-header"><div class="modal-title">&#128274; Enter Password</div><button class="modal-close" onclick="closeModal()">&#10005;</button></div>
     <div class="modal-body">
-      <div class="form-group"><label>Password</label><input type="password" id="inp-admin-pw" placeholder="Enter admin password" autofocus></div>
+      <p style="color:var(--text-dim);margin-bottom:12px;font-size:14px;">Enter the group password to vote and manage the bracket.</p>
+      <div class="form-group"><label>Password</label><input type="password" id="inp-admin-pw" placeholder="Group password" autofocus></div>
       <button class="btn btn-primary" onclick="doAdminLogin(${id})">Login</button>
     </div>
   </div>`;
@@ -575,7 +591,7 @@ async function shareWhatsApp(code) {
     window.open(data.whatsapp, '_blank');
   } catch (e) {
     const url = window.location.origin + '/' + code;
-    window.open(`https://wa.me/?text=${encodeURIComponent('Check out this bracket!\\n\\n' + url)}`, '_blank');
+    window.open(`https://wa.me/?text=${encodeURIComponent('Check out this bracket!\n\n' + url)}`, '_blank');
   }
 }
 
@@ -636,7 +652,7 @@ function renderBracketByData(data) {
         <div class="action-bar-left">
           <button class="btn btn-secondary btn-small" onclick="navigate('/tournament/${id}')">&#8592; Setup</button>
           <span class="badge badge-${data.status}">${data.status}</span>
-          ${data.has_password ? (isAdm ? '<span class="badge badge-admin">&#128274; Admin</span>' : '<span class="badge badge-locked">&#128274; Read Only</span>') : ''}
+          ${data.has_password ? (isAdm ? '<span class="badge badge-admin">&#128274; Logged In</span>' : '<span class="badge badge-locked">&#128274; Enter Password to Vote</span>') : ''}
         </div>
         <div class="action-bar-right" style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn btn-share-wa btn-small" onclick="shareWhatsApp('${code}')">&#128172; WhatsApp</button>
@@ -651,7 +667,7 @@ function renderBracketByData(data) {
       ${data.description ? `<p class="page-subtitle">${esc(data.description)}</p>` : ''}
       ${isAdm ? `<div class="panel" style="margin-bottom:16px;"><details><summary class="panel-title" style="cursor:pointer;">&#9835; Entries (${data.entries.length}) — click to edit</summary>${renderEntryList(data.entries, true, false)}</details></div>` : ''}
       ${isAdm && data.has_password ? renderRevealPanel(data, totalMatches, revealedMatchCount, canRevealNext, canRevealNextMatch, allMatchesRevealed) : ''}
-      ${!isAdm && data.has_password ? '<div class="admin-prompt"><button class="btn btn-secondary" onclick="showAdminLogin(' + id + ')">&#128274; Admin Login</button><span class="admin-prompt-text">Login to vote and manage the bracket</span></div>' : ''}
+      ${!isAdm && data.has_password ? '<div class="admin-prompt"><button class="btn btn-secondary" onclick="showAdminLogin(' + id + ')">&#128274; Enter Password</button><span class="admin-prompt-text">Enter the group password to vote</span></div>' : ''}
       ${champion ? `<div class="champion-banner"><div class="champion-label">&#127942; Champion</div><div class="champion-name">${esc(champion.name)}</div><div class="champion-seed">Seed #${champion.seed}</div></div>` : ''}
       ${visibleRounds.length === 0 ? '<div class="empty-state"><div class="empty-state-icon">&#128065;</div><div class="empty-state-title">Matches not yet revealed</div><div class="empty-state-text">Check back later or ask the admin to reveal matches.</div></div>' : ''}
       <div class="bracket-view">
@@ -973,15 +989,15 @@ const faqContent = `
   </details>
   <details class="faq-item">
     <summary class="faq-question">How do I create a tournament?</summary>
-    <div class="faq-answer">Fill in a title, add songs with optional YouTube links, then hit Start Tournament. You'll get a shareable link and room code to send to your group.</div>
+    <div class="faq-answer">Fill in a title, add songs with optional YouTube links, then hit Start Tournament. You'll get a shareable link and an auto-generated password to share with your group.</div>
   </details>
   <details class="faq-item">
-    <summary class="faq-question">What does the admin password do?</summary>
-    <div class="faq-answer">Setting a password makes you the admin. Only admins can vote (pick winners), reveal matchups one at a time, and edit entries. Without a password, anyone can vote and all matches are visible immediately.</div>
+    <summary class="faq-question">What does the password do?</summary>
+    <div class="faq-answer">A password is generated when you create a bracket. Share it with your group — it's the only way to vote and manage the bracket. Don't lose it!</div>
   </details>
   <details class="faq-item">
     <summary class="faq-question">How do match reveals work?</summary>
-    <div class="faq-answer">If you set a password, matches start hidden. The admin reveals one matchup at a time — each reveals two songs and their audio. You must pick a winner before revealing the next match. This is great for running a group listening session where everyone discovers each pairing together.</div>
+    <div class="faq-answer">Matches start hidden. Reveal one matchup at a time — each reveals two songs and their audio. You must pick a winner before revealing the next match. This is great for running a group listening session where everyone discovers each pairing together.</div>
   </details>
   <details class="faq-item">
     <summary class="faq-question">Does auto-reveal work?</summary>
@@ -989,7 +1005,7 @@ const faqContent = `
   </details>
   <details class="faq-item">
     <summary class="faq-question">How do I share the bracket?</summary>
-    <div class="faq-answer">Use the WhatsApp or Copy Link button on the bracket page. Anyone with the link can view it — no account needed. If you set a password, non-admins see the bracket read-only.</div>
+    <div class="faq-answer">Use the WhatsApp or Copy Link button on the bracket page. Share the password too — it's the only way your group can vote.</div>
   </details>
   <details class="faq-item">
     <summary class="faq-question">Can I edit songs after starting?</summary>

@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.3.0
+
+- **Auto-generated passwords** — passwords are now auto-generated on tournament creation (e.g. `bold-track-47`) and shown once in a copyable modal; no more picking your own password
+- **Password modal on creation** — after creating a bracket, a modal shows the password and share link with Copy Link + Password and Copy Password Only buttons that close the modal and navigate to the bracket
+- **Simplified login UX** — "Admin Login" renamed to "Enter Password" with friendlier messaging; badges updated to "Logged In" / "Enter Password to Vote"
+- **Duplicate share endpoint removed** — cleaned up duplicate `/api/tournaments/code/:code/share` route
+- **FAQ and README updated** — reflects password changes throughout
+
 ## v1.2.0
 
 - **Link previews** — Open Graph and Twitter Card meta tags are injected server-side so shared URLs (WhatsApp, Discord, iMessage, etc.) show the tournament name and description as the link preview

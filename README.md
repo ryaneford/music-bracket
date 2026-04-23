@@ -20,8 +20,8 @@ A self-hosted single-elimination bracket tournament app for music — run "Best 
 - **YouTube audio playback** — play songs head-to-head with embedded player
 - **Match-by-match reveals** — admin reveals one matchup at a time; entries stay hidden until revealed
 - **Auto-reveal timer** — set a daily time (e.g. 12:00 PM) and matches reveal automatically on schedule
-- **Admin password protection** — restrict voting, reveals, and editing to authenticated admins
-- **Share links** — WhatsApp and copy-link buttons with pre-written messages
+- **Admin password protection** — auto-generated memorable passwords (e.g. `bold-track-47`) restrict voting and reveals to those who have it
+- **Share links** — WhatsApp and copy-link buttons; "Copy Link + Password" copies everything in one click
 - **Link previews** — Open Graph meta tags so shared links show the tournament name
 - **Edit entries** — admins can rename songs and update YouTube URLs at any time
 - **Bulk import** — paste multiple songs at once (`Name | YouTube URL` per line)
@@ -86,8 +86,8 @@ Data is stored in `./data/brackets.db` (SQLite). Mount the `data` directory as a
 ### Creating a Tournament
 
 1. Enter a title and optional description
-2. Optionally set an admin password to control who can vote and reveal matches
-3. Click **Create Tournament** — you'll get a shareable link and room code
+2. A password is auto-generated — share it with your group so they can vote
+3. Click **Create Tournament** — you'll get a shareable link, room code, and password
 
 ### Adding Entries
 
@@ -97,16 +97,16 @@ Data is stored in `./data/brackets.db` (SQLite). Mount the `data` directory as a
 
 ### Running a Bracket
 
-- **Admins** reveal matches one at a time — each reveal shows two songs and their audio players
+- Matches are revealed one at a time — each reveal shows two songs and their audio players
 - Pick a winner before revealing the next match
 - **Auto-reveal** can be set to a daily time (e.g. 12:00 PM) so matches reveal on schedule
-- Non-admin users see the bracket read-only — hidden matches show as "???"
+- Users without the password see the bracket read-only — hidden matches show as "???"
 
 ### Sharing
 
-- Use the **WhatsApp** or **Copy Link** buttons on the bracket page
-- Anyone with the link can view — no account needed
-- If a password is set, non-admins see the bracket but cannot vote or reveal matches
+- Use the **WhatsApp** or **Copy Link** button on the bracket page
+- Share the password too — it's the only way your group can vote
+- Anyone with the link can view the bracket; the password is needed to vote
 
 ## FAQ
 
@@ -116,15 +116,15 @@ A single-elimination tournament where songs go head-to-head in matchups. You lis
 
 ### How do I create a tournament?
 
-Fill in a title, add songs with optional YouTube links, then hit **Start Tournament**. You'll get a shareable link and room code to send to your group.
+Fill in a title, add songs with optional YouTube links, then hit **Start Tournament**. You'll get a shareable link, room code, and an auto-generated password to share with your group.
 
-### What does the admin password do?
+### What does the password do?
 
-Setting a password makes you the admin. Only admins can vote (pick winners), reveal matchups one at a time, and edit entries. Without a password, anyone can vote and all matches are visible immediately.
+A password is auto-generated when you create a bracket. Share it with your group — it's the only way to vote and manage the bracket. Don't lose it!
 
 ### How do match reveals work?
 
-If you set a password, matches start hidden. The admin reveals one matchup at a time — each reveals two songs and their audio. You must pick a winner before revealing the next match. This is great for running a group listening session where everyone discovers each pairing together.
+Matches start hidden. Reveal one matchup at a time — each reveals two songs and their audio. Pick a winner before revealing the next match. This is great for running a group listening session where everyone discovers each pairing together.
 
 ### Does auto-reveal work?
 
@@ -132,15 +132,15 @@ Yes — set a daily time (e.g. 12:00 PM) and one match will reveal automatically
 
 ### How do I share the bracket?
 
-Use the **WhatsApp** or **Copy Link** button on the bracket page. Anyone with the link can view it — no account needed. If you set a password, non-admins see the bracket read-only.
+Use the **WhatsApp** or **Copy Link** button on the bracket page. Share the password too — it's the only way your group can vote.
 
 ### Can I edit songs after starting?
 
-Yes — admins can edit song names and YouTube links at any time by clicking the pen icon next to an entry.
+Yes — anyone with the password can edit song names and YouTube links at any time by clicking the pen icon next to an entry.
 
-### Can I log out of admin mode?
+### Can I log out?
 
-Yes — click the **Logout** button in the bracket header. You'll be returned to the home page and can log back in with the password at any time.
+Yes — click the **Logout** button in the bracket header. You can log back in with the password at any time.
 
 ## Reverse Proxy
 

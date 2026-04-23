@@ -322,37 +322,6 @@ app.get('/api/tournaments/code/:code/share', (req, res) => {
   res.json({ code: tournament.code, url, message, whatsapp: `https://wa.me/?text=${encodeURIComponent(message)}` });
 });
 
-app.get('/api/tournaments/code/:code/share', (req, res) => {
-  let tournament = db.prepare('SELECT * FROM tournaments WHERE code = ?').get(req.params.code);
-  if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
-  tournament = processTimedReveal(tournament);
-  const entryCount = db.prepare('SELECT COUNT(*) as count FROM entries WHERE tournament_id = ?').get(tournament.id).count;
-  const host = req.get('host') || `localhost:${PORT}`;
-  const proto = req.protocol || 'http';
-  const baseUrl = `${proto}://${host}`;
-  const url = `${baseUrl}/${tournament.code}`;
-  let message;
-  if (tournament.status === 'draft') {
-    message = `\u{1F3A7} ${tournament.title} \u2014 ${entryCount} entries seeded! Check it out.\n\n${url}`;
-  } else if (tournament.status === 'completed') {
-    const maxRound = db.prepare('SELECT MAX(round) as max_round FROM matches WHERE tournament_id = ?').get(tournament.id).max_round;
-    const finalMatch = db.prepare('SELECT * FROM matches WHERE tournament_id = ? AND round = ?').get(tournament.id, maxRound);
-    let championName = '';
-    if (finalMatch && finalMatch.winner_id) {
-      const champion = db.prepare('SELECT * FROM entries WHERE id = ?').get(finalMatch.winner_id);
-      if (champion) championName = champion.name;
-    }
-    message = `\u{1F3C6} ${tournament.title} \u2014 Champion: ${championName}!\n\nSee the full bracket:\n${url}`;
-  } else {
-    const revealedCount = tournament.revealed_match_count;
-    const totalMatches = db.prepare('SELECT COUNT(*) as count FROM matches WHERE tournament_id = ?').get(tournament.id).count;
-    message = `\u{1F5F3}\uFE0F ${tournament.title} \u2014 Match ${revealedCount}/${totalMatches} revealed! Listen & vote.\n\n${url}`;
-  }
-  res.json({ code: tournament.code, url, message, whatsapp: `https://wa.me/?text=${encodeURIComponent(message)}` });
-});
-
-// --- AUTH ENDPOINT ---
-
 app.post('/api/tournaments/:id/auth', (req, res) => {
   const { password } = req.body;
   let tournament;
@@ -371,15 +340,23 @@ app.post('/api/tournaments/:id/auth', (req, res) => {
 
 // --- TOURNAMENT MANAGEMENT ---
 
+function generateSimplePassword() {
+  const adjectives = ['swift','bold','loud','cool','warm','soft','wild','dark','gold','neon','rare','fair','deep','rich','keen','pure','fast','true','brave','epic'];
+  const nouns = ['stage','track','sound','beat','note','chord','groove','anthem','riff','verse','hook','tempo','melody','sonic','tune','drum','bass','solo','echo','wave'];
+  return adjectives[Math.floor(Math.random() * adjectives.length)] + '-' + nouns[Math.floor(Math.random() * nouns.length)] + '-' + Math.floor(10 + Math.random() * 90);
+}
+
 app.post('/api/tournaments', (req, res) => {
-  const { title, description, admin_password } = req.body;
+  const { title, description } = req.body;
   if (!title || !title.trim()) return res.status(400).json({ error: 'Title is required' });
-  const passwordHash = admin_password ? bcrypt.hashSync(admin_password, 10) : null;
+  const plainPassword = generateSimplePassword();
+  const passwordHash = bcrypt.hashSync(plainPassword, 10);
   let code;
   do { code = generateCode(); } while (db.prepare('SELECT id FROM tournaments WHERE code = ?').get(code));
   const result = db.prepare('INSERT INTO tournaments (title, description, admin_password_hash, code) VALUES (?, ?, ?, ?)').run(title.trim(), (description || '').trim(), passwordHash, code);
   const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(result.lastInsertRowid);
-  res.json(sanitizeTournament(tournament, true));
+  const token = generateToken(tournament.id);
+  res.json({ ...sanitizeTournament(tournament, true), password: plainPassword, token });
 });
 
 app.post('/api/tournaments/:id/start', requireAdmin, (req, res) => {
