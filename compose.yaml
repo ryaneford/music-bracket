@@ -1,6 +1,6 @@
 services:
   music-bracket:
-    build: ./app
+    image: ryaneford/music-bracket:latest
     container_name: music-bracket
     ports:
       - "3211:3000"
