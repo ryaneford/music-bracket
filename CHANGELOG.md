@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.4.0
+
+- **YouTube link preview** — pasting a YouTube URL into Add Entry or Edit Entry now shows a live thumbnail + video title (via YouTube's oEmbed API), so you can confirm the link resolves to the right song before saving
+- **Bulk import validation** — each pasted line is checked live, showing a title preview, a "bad link" flag, or "no link" per row before you hit Import
+- **Broader link support** — recognizes `youtube.com/shorts/`, `music.youtube.com`, `youtube-nocookie.com`, and bare 11-character video IDs, in addition to standard watch/share/embed links; fixed a regex typo that broke embed-link parsing
+- **URL normalization on save** — YouTube links are canonicalized server-side (`https://www.youtube.com/watch?v=ID`) regardless of how they were pasted (mobile share links, timestamps, playlist params, etc.)
+
 ## v1.3.0
 
 - **Auto-generated passwords** — passwords are now auto-generated on tournament creation (e.g. `bold-track-47`) and shown once in a copyable modal; no more picking your own password

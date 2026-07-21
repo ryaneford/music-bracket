@@ -211,6 +211,28 @@ function getSeedingOrder(size) {
 
 function nextPowerOf2(n) { let p = 1; while (p < n) p *= 2; return p; }
 
+function extractYouTubeId(url) {
+  if (!url) return null;
+  const trimmed = url.trim();
+  const patterns = [
+    /(?:youtube(?:-nocookie)?\.com\/watch\?(?:.*&)?v=)([a-zA-Z0-9_-]{11})/,
+    /(?:youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+    /(?:youtube(?:-nocookie)?\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+    /(?:youtube\.com\/v\/)([a-zA-Z0-9_-]{11})/,
+    /(?:youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+    /(?:music\.youtube\.com\/watch\?(?:.*&)?v=)([a-zA-Z0-9_-]{11})/,
+  ];
+  for (const pattern of patterns) { const match = trimmed.match(pattern); if (match) return match[1]; }
+  if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) return trimmed;
+  return null;
+}
+
+function normalizeYoutubeUrl(url) {
+  if (!url) return '';
+  const id = extractYouTubeId(url);
+  return id ? `https://www.youtube.com/watch?v=${id}` : url.trim();
+}
+
 function isDeadSlot(match, nullSlot, tournamentId) {
   if (match.round === 0) return true;
   const sourcePos = nullSlot === 'entry1_id' ? match.position * 2 : match.position * 2 + 1;
@@ -408,7 +430,7 @@ app.post('/api/tournaments/:id/entries', requireAdmin, (req, res) => {
   const { name, youtube_url } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
   const count = db.prepare('SELECT COUNT(*) as count FROM entries WHERE tournament_id = ?').get(tournament.id).count;
-  const result = db.prepare('INSERT INTO entries (tournament_id, name, youtube_url, seed) VALUES (?, ?, ?, ?)').run(tournament.id, name.trim(), youtube_url || '', count + 1);
+  const result = db.prepare('INSERT INTO entries (tournament_id, name, youtube_url, seed) VALUES (?, ?, ?, ?)').run(tournament.id, name.trim(), normalizeYoutubeUrl(youtube_url), count + 1);
   const entry = db.prepare('SELECT * FROM entries WHERE id = ?').get(result.lastInsertRowid);
   res.json(entry);
 });
@@ -432,7 +454,7 @@ app.post('/api/tournaments/:id/entries/bulk', requireAdmin, (req, res) => {
     const name = (e.name || '').trim();
     if (!name) continue;
     count++;
-    const result = insertStmt.run(tournament.id, name, e.youtube_url || '', count);
+    const result = insertStmt.run(tournament.id, name, normalizeYoutubeUrl(e.youtube_url), count);
     added.push(db.prepare('SELECT * FROM entries WHERE id = ?').get(result.lastInsertRowid));
   }
   res.json({ added: added.length, entries: added });
@@ -511,7 +533,7 @@ app.put('/api/tournaments/:id/entries/:entryId', requireAdmin, (req, res) => {
   if (!entry) return res.status(404).json({ error: 'Entry not found' });
   const { name, youtube_url } = req.body;
   if (name !== undefined) db.prepare('UPDATE entries SET name = ? WHERE id = ?').run(name.trim(), entry.id);
-  if (youtube_url !== undefined) db.prepare('UPDATE entries SET youtube_url = ? WHERE id = ?').run(youtube_url || '', entry.id);
+  if (youtube_url !== undefined) db.prepare('UPDATE entries SET youtube_url = ? WHERE id = ?').run(normalizeYoutubeUrl(youtube_url), entry.id);
   const updatedEntry = db.prepare('SELECT * FROM entries WHERE id = ?').get(entry.id);
   res.json(updatedEntry);
 });

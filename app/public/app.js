@@ -385,7 +385,9 @@ function renderTournamentByData(data) {
                 <div class="form-group"><label>Name</label>
                   <input type="text" id="inp-entry-name" placeholder="Song or track name"></div>
                 <div class="form-group"><label>YouTube URL (optional)</label>
-                  <input type="text" id="inp-entry-youtube" placeholder="https://youtube.com/watch?v=..."></div>
+                  <input type="text" id="inp-entry-youtube" placeholder="https://youtube.com/watch?v=..." oninput="debouncedYtPreview('inp-entry-youtube','yt-preview-add')">
+                  <div id="yt-preview-add" class="yt-preview"></div>
+                </div>
                 <button class="btn btn-primary" onclick="addEntry(${id})">Add Entry</button>
               </div>
               <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px;">
@@ -393,7 +395,8 @@ function renderTournamentByData(data) {
                   <summary class="faq-question">Bulk Import</summary>
                   <div class="faq-answer" style="padding:12px 16px;">
                     <p style="margin-bottom:8px;">One entry per line. Format: <code>Song Name | YouTube URL</code> (URL is optional)</p>
-                    <textarea id="inp-bulk-entries" rows="6" placeholder="Artist - Song Title&#10;Another Song | https://youtube.com/watch?v=...&#10;Third Track"></textarea>
+                    <textarea id="inp-bulk-entries" rows="6" placeholder="Artist - Song Title&#10;Another Song | https://youtube.com/watch?v=...&#10;Third Track" oninput="debouncedBulkPreview()"></textarea>
+                    <div id="bulk-preview" class="bulk-preview"></div>
                     <button class="btn btn-secondary" style="margin-top:8px;" onclick="bulkImport(${id})">Import All</button>
                   </div>
                 </details>
@@ -447,6 +450,7 @@ async function addEntry(id) {
     await apiAuth('POST', `/tournaments/${id}/entries`, { name, youtube_url: youtube }, id);
     document.getElementById('inp-entry-name').value = '';
     document.getElementById('inp-entry-youtube').value = '';
+    document.getElementById('yt-preview-add').innerHTML = '';
     document.getElementById('inp-entry-name').focus();
     renderTournament(id);
   } catch (e) { showToast(e.message, 'error'); }
@@ -475,6 +479,7 @@ async function bulkImport(id) {
   try {
     const result = await apiAuth('POST', `/tournaments/${id}/entries/bulk`, { entries }, id);
     document.getElementById('inp-bulk-entries').value = '';
+    document.getElementById('bulk-preview').innerHTML = '';
     showToast('Added ' + result.added + ' entries', 'success');
     renderTournament(id);
   } catch (e) { showToast(e.message, 'error'); }
@@ -495,7 +500,10 @@ function showEditEntry(tournamentId, entryId) {
     <div class="modal-header"><div class="modal-title">&#9998; Edit Entry</div><button class="modal-close" onclick="closeModal()">&#10005;</button></div>
     <div class="modal-body">
       <div class="form-group"><label>Name</label><input type="text" id="inp-edit-name" value="${esc(entry.name)}"></div>
-      <div class="form-group"><label>YouTube URL</label><input type="text" id="inp-edit-youtube" value="${esc(entry.youtube_url || '')}" placeholder="https://youtube.com/watch?v=..."></div>
+      <div class="form-group"><label>YouTube URL</label>
+        <input type="text" id="inp-edit-youtube" value="${esc(entry.youtube_url || '')}" placeholder="https://youtube.com/watch?v=..." oninput="debouncedYtPreview('inp-edit-youtube','yt-preview-edit')">
+        <div id="yt-preview-edit" class="yt-preview"></div>
+      </div>
       <button class="btn btn-primary" onclick="doEditEntry(${tournamentId}, ${entryId})">Save</button>
     </div>
   </div>`;
@@ -503,6 +511,7 @@ function showEditEntry(tournamentId, entryId) {
   activeModal = overlay;
   document.addEventListener('keydown', modalKeyHandler);
   document.getElementById('inp-edit-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') doEditEntry(tournamentId, entryId); });
+  if (entry.youtube_url) renderYtPreview('inp-edit-youtube', 'yt-preview-edit');
 }
 
 async function doEditEntry(tournamentId, entryId) {
@@ -970,14 +979,90 @@ async function updateRevealTime(id) {
 
 function extractYouTubeId(url) {
   if (!url) return null;
+  const trimmed = url.trim();
   const patterns = [
-    /(?:youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/,
+    /(?:youtube(?:-nocookie)?\.com\/watch\?(?:.*&)?v=)([a-zA-Z0-9_-]{11})/,
     /(?:youtu\.be\/)([a-zA-Z0-9_-]{11})/,
-    /(?:youtube\.com\/embed\/)([a-zA-zA-Z0-9_-]{11})/,
+    /(?:youtube(?:-nocookie)?\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
     /(?:youtube\.com\/v\/)([a-zA-Z0-9_-]{11})/,
+    /(?:youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+    /(?:music\.youtube\.com\/watch\?(?:.*&)?v=)([a-zA-Z0-9_-]{11})/,
   ];
-  for (const pattern of patterns) { const match = url.match(pattern); if (match) return match[1]; }
+  for (const pattern of patterns) { const match = trimmed.match(pattern); if (match) return match[1]; }
+  if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) return trimmed;
   return null;
+}
+
+// --- YouTube link preview (oEmbed) ---
+
+const oembedCache = {};
+const ytPreviewTimers = {};
+
+async function fetchOEmbed(videoId) {
+  if (oembedCache[videoId]) return oembedCache[videoId];
+  try {
+    const res = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent('https://www.youtube.com/watch?v=' + videoId)}&format=json`);
+    if (!res.ok) throw new Error('not found');
+    const data = await res.json();
+    oembedCache[videoId] = { ok: true, title: data.title, thumbnail: data.thumbnail_url };
+  } catch (e) {
+    oembedCache[videoId] = { ok: false };
+  }
+  return oembedCache[videoId];
+}
+
+function debouncedYtPreview(inputId, previewId) {
+  clearTimeout(ytPreviewTimers[previewId]);
+  ytPreviewTimers[previewId] = setTimeout(() => renderYtPreview(inputId, previewId), 500);
+}
+
+async function renderYtPreview(inputId, previewId) {
+  const el = document.getElementById(previewId);
+  const input = document.getElementById(inputId);
+  if (!el || !input) return;
+  const url = input.value.trim();
+  if (!url) { el.innerHTML = ''; return; }
+  const videoId = extractYouTubeId(url);
+  if (!videoId) { el.innerHTML = '<div class="yt-preview-error">&#9888; Not a recognized YouTube link</div>'; return; }
+  el.innerHTML = '<div class="yt-preview-loading">Checking video&hellip;</div>';
+  const info = await fetchOEmbed(videoId);
+  if (input.value.trim() !== url) return;
+  if (!info.ok) { el.innerHTML = '<div class="yt-preview-error">&#9888; Video not found or unavailable</div>'; return; }
+  el.innerHTML = `<div class="yt-preview-card"><img src="${esc(info.thumbnail)}" alt=""><span class="yt-preview-title">${esc(info.title)}</span></div>`;
+}
+
+function debouncedBulkPreview() {
+  clearTimeout(ytPreviewTimers['bulk']);
+  ytPreviewTimers['bulk'] = setTimeout(renderBulkPreview, 500);
+}
+
+async function renderBulkPreview() {
+  const textarea = document.getElementById('inp-bulk-entries');
+  const preview = document.getElementById('bulk-preview');
+  if (!textarea || !preview) return;
+  const lines = textarea.value.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) { preview.innerHTML = ''; return; }
+  const parsed = lines.map(line => {
+    const parts = line.split('|');
+    const name = parts[0].trim();
+    const youtube_url = (parts[1] || '').trim();
+    const videoId = youtube_url ? extractYouTubeId(youtube_url) : null;
+    return { name, youtube_url, videoId };
+  });
+  preview.innerHTML = parsed.map((p, i) => `<div class="bulk-preview-row" id="bulk-row-${i}">
+    <span class="bulk-preview-name">${esc(p.name || '(missing name)')}</span>
+    <span class="bulk-preview-status">${!p.youtube_url ? '<span class="yt-badge yt-badge-none">no link</span>' : (p.videoId ? '<span class="yt-badge yt-badge-checking">checking&hellip;</span>' : '<span class="yt-badge yt-badge-error">bad link</span>')}</span>
+  </div>`).join('');
+  parsed.forEach(async (p, i) => {
+    if (!p.videoId) return;
+    const info = await fetchOEmbed(p.videoId);
+    const row = document.getElementById('bulk-row-' + i);
+    const statusEl = row && row.querySelector('.bulk-preview-status');
+    if (!statusEl) return;
+    statusEl.innerHTML = info.ok
+      ? `<span class="yt-badge yt-badge-ok" title="${esc(info.title)}">&#10003; ${esc(info.title)}</span>`
+      : '<span class="yt-badge yt-badge-error">video unavailable</span>';
+  });
 }
 
 function esc(str) { if (!str) return ''; const div = document.createElement('div'); div.textContent = str; return div.innerHTML; }

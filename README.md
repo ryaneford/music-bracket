@@ -24,7 +24,8 @@ A self-hosted single-elimination bracket tournament app for music — run "Best 
 - **Share links** — WhatsApp and copy-link buttons; "Copy Link + Password" copies everything in one click
 - **Link previews** — Open Graph meta tags so shared links show the tournament name
 - **Edit entries** — admins can rename songs and update YouTube URLs at any time
-- **Bulk import** — paste multiple songs at once (`Name | YouTube URL` per line)
+- **YouTube link preview** — pasted links show a live thumbnail and title before you save, so you can confirm you've got the right song; supports watch/share links, Shorts, YouTube Music, and bare video IDs
+- **Bulk import** — paste multiple songs at once (`Name | YouTube URL` per line), with live per-line validation before import
 - **Bracket restart** — reset all matches while keeping entries in draft mode
 - **PNG export** — export the bracket as a screenshot image
 - **No accounts needed** — anyone with the link can view; password is optional
@@ -91,7 +92,7 @@ Data is stored in `./data/brackets.db` (SQLite). Mount the `data` directory as a
 
 ### Adding Entries
 
-1. On the setup page, add song names and YouTube URLs
+1. On the setup page, add song names and YouTube URLs — a thumbnail and title preview appears as you paste a link so you can confirm it's the right video
 2. Entries can be dragged to reorder seeding (or auto-seeded by entry order)
 3. Click **Start Tournament** when ready
 
