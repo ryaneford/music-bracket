@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.5.0
+
+- **Version footer** — a small version badge now sits in the bottom corner of the app; clicking it pops open a compact changelog panel so admins can see what's new without leaving the page
+
+## v1.4.1
+
+- **FAQ overhaul** — the in-app "How It Works" modal and README FAQ now cover bulk import, byes/seeding for non-power-of-2 entry counts, bracket restart, PNG export, and logout, and follow the actual creation-to-sharing workflow instead of being stuck at the v1.0 feature set
+
 ## v1.4.0
 
 - **YouTube link preview** — pasting a YouTube URL into Add Entry or Edit Entry now shows a live thumbnail + video title (via YouTube's oEmbed API), so you can confirm the link resolves to the right song before saving

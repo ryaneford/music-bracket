@@ -304,6 +304,85 @@ details:not([open]) summary.panel-title::before { content: '\25B8 '; }
   min-height: 60px;
 }
 
+.version-footer {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  z-index: 500;
+}
+
+.version-badge {
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--text-dim);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s, border-color 0.2s;
+}
+
+.version-badge:hover {
+  opacity: 1;
+  border-color: var(--border-accent);
+}
+
+.version-popout {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  width: 280px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  padding: 12px;
+}
+
+.version-popout-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+.version-entry {
+  margin-bottom: 10px;
+}
+
+.version-entry-num {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.version-entry-items {
+  list-style: none;
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.version-entry-items li {
+  padding-left: 12px;
+  position: relative;
+  margin-bottom: 2px;
+}
+
+.version-entry-items li::before {
+  content: '\2013';
+  position: absolute;
+  left: 0;
+  color: var(--text-dim);
+}
+
 .yt-preview {
   margin-top: 8px;
   font-size: 12px;

@@ -690,6 +690,47 @@ app.post('/api/tournaments/:id/restart', requireAdmin, (req, res) => {
   res.json({ ...sanitizeTournament(tournament, true), entries, matches: [] });
 });
 
+const packageJson = require('./package.json');
+
+const CHANGELOG = [
+  { version: '1.5.0', items: [
+    'Version footer — a small version badge now sits in the bottom corner of the app; clicking it pops open a compact changelog panel',
+  ] },
+  { version: '1.4.1', items: [
+    'FAQ overhaul — covers bulk import, byes/seeding, bracket restart, PNG export, and logout',
+  ] },
+  { version: '1.4.0', items: [
+    'YouTube link preview — live thumbnail + title when adding or editing a link',
+    'Bulk import validation — bad or missing links are flagged before you import',
+    'Broader link support — Shorts, YouTube Music, youtube-nocookie.com, bare video IDs',
+    'URL normalization on save — links are canonicalized regardless of how they were pasted',
+  ] },
+  { version: '1.3.0', items: [
+    'Auto-generated passwords shown once in a copyable modal',
+    'Password modal on creation with Copy Link + Password buttons',
+    'Simplified login UX',
+  ] },
+  { version: '1.2.0', items: [
+    'Link previews — Open Graph / Twitter Card tags for shared tournament links',
+    'Shuffle entries — randomize seeding in draft mode',
+    'FAQ modal fix — opens as an overlay instead of replacing the page',
+  ] },
+  { version: '1.1.0', items: [
+    'Bulk import — paste multiple songs at once',
+    'Duplicate detection on entry names',
+    'Bracket restart — reset matches while keeping entries',
+    'PNG export of the bracket view',
+    'Admin logout',
+  ] },
+  { version: '1.0.0', items: [
+    'Initial release — single-elimination brackets with match-by-match reveals, YouTube playback, password auth, auto-reveal timer, sharing',
+  ] },
+];
+
+app.get('/api/version', (req, res) => {
+  res.json({ version: packageJson.version, changelog: CHANGELOG });
+});
+
 const indexHtml = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
 
 function buildOgHtml(tournament) {

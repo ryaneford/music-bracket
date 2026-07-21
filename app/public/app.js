@@ -169,6 +169,41 @@ function init() {
   }
   window.addEventListener('popstate', route);
   route();
+  renderVersionFooter();
+}
+
+let versionInfo = null;
+
+async function renderVersionFooter() {
+  const footer = document.createElement('div');
+  footer.className = 'version-footer';
+  footer.innerHTML = '<button class="version-badge" id="version-badge">v&hellip;</button><div class="version-popout" id="version-popout" hidden></div>';
+  document.body.appendChild(footer);
+  document.getElementById('version-badge').addEventListener('click', toggleVersionPopout);
+  document.addEventListener('click', (e) => {
+    const popout = document.getElementById('version-popout');
+    if (!popout || popout.hidden) return;
+    if (!footer.contains(e.target)) popout.hidden = true;
+  });
+  try {
+    const res = await fetch('/api/version');
+    versionInfo = await res.json();
+    document.getElementById('version-badge').innerHTML = 'v' + esc(versionInfo.version);
+  } catch (e) { document.getElementById('version-badge').innerHTML = 'v?'; }
+}
+
+function toggleVersionPopout() {
+  const popout = document.getElementById('version-popout');
+  if (!popout) return;
+  if (!popout.hidden) { popout.hidden = true; return; }
+  if (versionInfo) {
+    popout.innerHTML = `<div class="version-popout-title">Changelog</div>` + versionInfo.changelog.map(entry => `
+      <div class="version-entry">
+        <div class="version-entry-num">v${esc(entry.version)}</div>
+        <ul class="version-entry-items">${entry.items.map(i => `<li>${esc(i)}</li>`).join('')}</ul>
+      </div>`).join('');
+  }
+  popout.hidden = false;
 }
 
 function route() {
