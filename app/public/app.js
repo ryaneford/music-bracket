@@ -1074,27 +1074,47 @@ const faqContent = `
   </details>
   <details class="faq-item">
     <summary class="faq-question">How do I create a tournament?</summary>
-    <div class="faq-answer">Fill in a title, add songs with optional YouTube links, then hit Start Tournament. You'll get a shareable link and an auto-generated password to share with your group.</div>
+    <div class="faq-answer">Enter a title, then add your songs. Click Start Tournament and you'll get a shareable link, room code, and an auto-generated password to hand out to your group.</div>
+  </details>
+  <details class="faq-item">
+    <summary class="faq-question">How do I add songs and YouTube links?</summary>
+    <div class="faq-answer">Add them one at a time, or open Bulk Import and paste a whole list at once (<code>Song Name | YouTube URL</code>, one per line). As you paste a link, a thumbnail and title preview appears so you can confirm it's the right video before saving — a YouTube link isn't required, songs can play with no audio too.</div>
+  </details>
+  <details class="faq-item">
+    <summary class="faq-question">What if I don't have a power-of-2 number of songs?</summary>
+    <div class="faq-answer">No problem — with, say, 6 or 11 entries, the top seeds automatically get a first-round bye so the bracket still fills out to the next size up (8, 16, 32...). Use Shuffle before starting if you want random seeding instead of entry order.</div>
   </details>
   <details class="faq-item">
     <summary class="faq-question">What does the password do?</summary>
-    <div class="faq-answer">A password is generated when you create a bracket. Share it with your group — it's the only way to vote and manage the bracket. Don't lose it!</div>
+    <div class="faq-answer">A password is auto-generated when you create a bracket. It's the only way to add songs, reveal matches, vote, and edit the tournament — share it with your group and don't lose it.</div>
   </details>
   <details class="faq-item">
     <summary class="faq-question">How do match reveals work?</summary>
-    <div class="faq-answer">Matches start hidden. Reveal one matchup at a time — each reveals two songs and their audio. You must pick a winner before revealing the next match. This is great for running a group listening session where everyone discovers each pairing together.</div>
+    <div class="faq-answer">Matches start hidden. Reveal one matchup at a time — each reveal shows two songs and their audio. Pick a winner before revealing the next match. This is great for running a group listening session where everyone discovers each pairing together.</div>
   </details>
   <details class="faq-item">
     <summary class="faq-question">Does auto-reveal work?</summary>
-    <div class="faq-answer">Yes — set a daily time (e.g. 12:00 PM) and one match will reveal automatically each day at that time. You still need to pick winners before the next match reveals.</div>
-  </details>
-  <details class="faq-item">
-    <summary class="faq-question">How do I share the bracket?</summary>
-    <div class="faq-answer">Use the WhatsApp or Copy Link button on the bracket page. Share the password too — it's the only way your group can vote.</div>
+    <div class="faq-answer">Yes — set a daily time (e.g. 12:00 PM) and one match reveals automatically each day at that time. You still need to pick a winner before the next one reveals.</div>
   </details>
   <details class="faq-item">
     <summary class="faq-question">Can I edit songs after starting?</summary>
-    <div class="faq-answer">Yes — admins can edit song names and YouTube links at any time by clicking the pen icon next to an entry.</div>
+    <div class="faq-answer">Yes — anyone with the password can rename songs or update YouTube links at any time by clicking the pen icon next to an entry, even mid-tournament.</div>
+  </details>
+  <details class="faq-item">
+    <summary class="faq-question">Can I restart or reset a bracket?</summary>
+    <div class="faq-answer">Yes — admins can restart a tournament, which clears all matches and reveals but keeps your entries, so you can reshuffle and run it again from the draft stage.</div>
+  </details>
+  <details class="faq-item">
+    <summary class="faq-question">How do I share the bracket?</summary>
+    <div class="faq-answer">Use the WhatsApp or Copy Link button on the bracket page. Anyone with the link can view; share the password too since it's the only way your group can vote.</div>
+  </details>
+  <details class="faq-item">
+    <summary class="faq-question">Can I export the bracket as an image?</summary>
+    <div class="faq-answer">Yes — use the export button on the bracket page to save the current bracket view as a PNG, handy for posting to a group chat.</div>
+  </details>
+  <details class="faq-item">
+    <summary class="faq-question">Can I log out?</summary>
+    <div class="faq-answer">Yes — click Logout in the bracket header. You can log back in with the password at any time.</div>
   </details>`;
 
 function showFaq() {

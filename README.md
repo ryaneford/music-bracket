@@ -117,27 +117,43 @@ A single-elimination tournament where songs go head-to-head in matchups. You lis
 
 ### How do I create a tournament?
 
-Fill in a title, add songs with optional YouTube links, then hit **Start Tournament**. You'll get a shareable link, room code, and an auto-generated password to share with your group.
+Enter a title, then add your songs. Click **Start Tournament** and you'll get a shareable link, room code, and an auto-generated password to hand out to your group.
+
+### How do I add songs and YouTube links?
+
+Add them one at a time, or open **Bulk Import** and paste a whole list at once (`Song Name | YouTube URL`, one per line). As you paste a link, a thumbnail and title preview appears so you can confirm it's the right video before saving — a YouTube link isn't required, songs can play with no audio too.
+
+### What if I don't have a power-of-2 number of songs?
+
+No problem — with, say, 6 or 11 entries, the top seeds automatically get a first-round bye so the bracket still fills out to the next size up (8, 16, 32...). Use **Shuffle** before starting if you want random seeding instead of entry order.
 
 ### What does the password do?
 
-A password is auto-generated when you create a bracket. Share it with your group — it's the only way to vote and manage the bracket. Don't lose it!
+A password is auto-generated when you create a bracket. It's the only way to add songs, reveal matches, vote, and edit the tournament — share it with your group and don't lose it.
 
 ### How do match reveals work?
 
-Matches start hidden. Reveal one matchup at a time — each reveals two songs and their audio. Pick a winner before revealing the next match. This is great for running a group listening session where everyone discovers each pairing together.
+Matches start hidden. Reveal one matchup at a time — each reveal shows two songs and their audio. Pick a winner before revealing the next match. This is great for running a group listening session where everyone discovers each pairing together.
 
 ### Does auto-reveal work?
 
-Yes — set a daily time (e.g. 12:00 PM) and one match will reveal automatically each day at that time. You still need to pick winners before the next match reveals.
-
-### How do I share the bracket?
-
-Use the **WhatsApp** or **Copy Link** button on the bracket page. Share the password too — it's the only way your group can vote.
+Yes — set a daily time (e.g. 12:00 PM) and one match reveals automatically each day at that time. You still need to pick a winner before the next one reveals.
 
 ### Can I edit songs after starting?
 
-Yes — anyone with the password can edit song names and YouTube links at any time by clicking the pen icon next to an entry.
+Yes — anyone with the password can rename songs or update YouTube links at any time by clicking the pen icon next to an entry, even mid-tournament.
+
+### Can I restart or reset a bracket?
+
+Yes — admins can restart a tournament, which clears all matches and reveals but keeps your entries, so you can reshuffle and run it again from the draft stage.
+
+### How do I share the bracket?
+
+Use the **WhatsApp** or **Copy Link** button on the bracket page. Anyone with the link can view; share the password too since it's the only way your group can vote.
+
+### Can I export the bracket as an image?
+
+Yes — use the **Export** button on the bracket page to save the current bracket view as a PNG, handy for posting to a group chat.
 
 ### Can I log out?
 
