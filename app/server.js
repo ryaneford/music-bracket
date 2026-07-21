@@ -693,6 +693,9 @@ app.post('/api/tournaments/:id/restart', requireAdmin, (req, res) => {
 const packageJson = require('./package.json');
 
 const CHANGELOG = [
+  { version: '1.6.0', items: [
+    'FAQ layout redo — grouped into categories in a two-column grid with a live search box',
+  ] },
   { version: '1.5.0', items: [
     'Version footer — a small version badge now sits in the bottom corner of the app; clicking it pops open a compact changelog panel',
   ] },

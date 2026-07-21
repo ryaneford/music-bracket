@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.6.0
+
+- **FAQ layout redo** — the "How It Works" FAQ is now grouped into categories (Getting Started, Running a Tournament, Sharing & Export, Your Account) laid out in a two-column grid instead of one long flat list, with a search box that filters questions and answers live and auto-expands matches
+
 ## v1.5.0
 
 - **Version footer** — a small version badge now sits in the bottom corner of the app; clicking it pops open a compact changelog panel so admins can see what's new without leaving the page

@@ -1,6 +1,6 @@
 {
   "name": "music-bracket",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Music tournament bracket creator with YouTube integration",
   "main": "server.js",
   "scripts": {

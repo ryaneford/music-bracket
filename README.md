@@ -29,6 +29,8 @@ A self-hosted single-elimination bracket tournament app for music — run "Best 
 - **Bracket restart** — reset all matches while keeping entries in draft mode
 - **PNG export** — export the bracket as a screenshot image
 - **No accounts needed** — anyone with the link can view; password is optional
+- **Searchable, categorized FAQ** — the "How It Works" guide is grouped by topic with a live search box
+- **Version footer** — a small badge in the corner shows the running version and pops open a changelog
 
 ## Quick Start
 

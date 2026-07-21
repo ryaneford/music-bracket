@@ -1102,67 +1102,79 @@ async function renderBulkPreview() {
 
 function esc(str) { if (!str) return ''; const div = document.createElement('div'); div.textContent = str; return div.innerHTML; }
 
-const faqContent = `
-  <details class="faq-item">
-    <summary class="faq-question">What is a music bracket?</summary>
-    <div class="faq-answer">A single-elimination tournament where songs go head-to-head in matchups. You listen to two tracks, vote for your favorite, and the winner advances to the next round until only one song remains.</div>
-  </details>
-  <details class="faq-item">
-    <summary class="faq-question">How do I create a tournament?</summary>
-    <div class="faq-answer">Enter a title, then add your songs. Click Start Tournament and you'll get a shareable link, room code, and an auto-generated password to hand out to your group.</div>
-  </details>
-  <details class="faq-item">
-    <summary class="faq-question">How do I add songs and YouTube links?</summary>
-    <div class="faq-answer">Add them one at a time, or open Bulk Import and paste a whole list at once (<code>Song Name | YouTube URL</code>, one per line). As you paste a link, a thumbnail and title preview appears so you can confirm it's the right video before saving — a YouTube link isn't required, songs can play with no audio too.</div>
-  </details>
-  <details class="faq-item">
-    <summary class="faq-question">What if I don't have a power-of-2 number of songs?</summary>
-    <div class="faq-answer">No problem — with, say, 6 or 11 entries, the top seeds automatically get a first-round bye so the bracket still fills out to the next size up (8, 16, 32...). Use Shuffle before starting if you want random seeding instead of entry order.</div>
-  </details>
-  <details class="faq-item">
-    <summary class="faq-question">What does the password do?</summary>
-    <div class="faq-answer">A password is auto-generated when you create a bracket. It's the only way to add songs, reveal matches, vote, and edit the tournament — share it with your group and don't lose it.</div>
-  </details>
-  <details class="faq-item">
-    <summary class="faq-question">How do match reveals work?</summary>
-    <div class="faq-answer">Matches start hidden. Reveal one matchup at a time — each reveal shows two songs and their audio. Pick a winner before revealing the next match. This is great for running a group listening session where everyone discovers each pairing together.</div>
-  </details>
-  <details class="faq-item">
-    <summary class="faq-question">Does auto-reveal work?</summary>
-    <div class="faq-answer">Yes — set a daily time (e.g. 12:00 PM) and one match reveals automatically each day at that time. You still need to pick a winner before the next one reveals.</div>
-  </details>
-  <details class="faq-item">
-    <summary class="faq-question">Can I edit songs after starting?</summary>
-    <div class="faq-answer">Yes — anyone with the password can rename songs or update YouTube links at any time by clicking the pen icon next to an entry, even mid-tournament.</div>
-  </details>
-  <details class="faq-item">
-    <summary class="faq-question">Can I restart or reset a bracket?</summary>
-    <div class="faq-answer">Yes — admins can restart a tournament, which clears all matches and reveals but keeps your entries, so you can reshuffle and run it again from the draft stage.</div>
-  </details>
-  <details class="faq-item">
-    <summary class="faq-question">How do I share the bracket?</summary>
-    <div class="faq-answer">Use the WhatsApp or Copy Link button on the bracket page. Anyone with the link can view; share the password too since it's the only way your group can vote.</div>
-  </details>
-  <details class="faq-item">
-    <summary class="faq-question">Can I export the bracket as an image?</summary>
-    <div class="faq-answer">Yes — use the export button on the bracket page to save the current bracket view as a PNG, handy for posting to a group chat.</div>
-  </details>
-  <details class="faq-item">
-    <summary class="faq-question">Can I log out?</summary>
-    <div class="faq-answer">Yes — click Logout in the bracket header. You can log back in with the password at any time.</div>
-  </details>`;
+const faqCategories = [
+  {
+    title: 'Getting Started',
+    items: [
+      { q: 'What is a music bracket?', a: 'A single-elimination tournament where songs go head-to-head in matchups. You listen to two tracks, vote for your favorite, and the winner advances to the next round until only one song remains.' },
+      { q: 'How do I create a tournament?', a: "Enter a title, then add your songs. Click Start Tournament and you'll get a shareable link, room code, and an auto-generated password to hand out to your group." },
+      { q: 'How do I add songs and YouTube links?', a: "Add them one at a time, or open Bulk Import and paste a whole list at once (Song Name | YouTube URL, one per line). As you paste a link, a thumbnail and title preview appears so you can confirm it's the right video before saving — a YouTube link isn't required, songs can play with no audio too." },
+      { q: "What if I don't have a power-of-2 number of songs?", a: 'No problem — with, say, 6 or 11 entries, the top seeds automatically get a first-round bye so the bracket still fills out to the next size up (8, 16, 32...). Use Shuffle before starting if you want random seeding instead of entry order.' },
+    ],
+  },
+  {
+    title: 'Running a Tournament',
+    items: [
+      { q: 'What does the password do?', a: "A password is auto-generated when you create a bracket. It's the only way to add songs, reveal matches, vote, and edit the tournament — share it with your group and don't lose it." },
+      { q: 'How do match reveals work?', a: 'Matches start hidden. Reveal one matchup at a time — each reveal shows two songs and their audio. Pick a winner before revealing the next match. This is great for running a group listening session where everyone discovers each pairing together.' },
+      { q: 'Does auto-reveal work?', a: 'Yes — set a daily time (e.g. 12:00 PM) and one match reveals automatically each day at that time. You still need to pick a winner before the next one reveals.' },
+      { q: 'Can I edit songs after starting?', a: 'Yes — anyone with the password can rename songs or update YouTube links at any time by clicking the pen icon next to an entry, even mid-tournament.' },
+      { q: 'Can I restart or reset a bracket?', a: 'Yes — admins can restart a tournament, which clears all matches and reveals but keeps your entries, so you can reshuffle and run it again from the draft stage.' },
+    ],
+  },
+  {
+    title: 'Sharing & Export',
+    items: [
+      { q: 'How do I share the bracket?', a: 'Use the WhatsApp or Copy Link button on the bracket page. Anyone with the link can view; share the password too since it\'s the only way your group can vote.' },
+      { q: 'Can I export the bracket as an image?', a: 'Yes — use the Export button on the bracket page to save the current bracket view as a PNG, handy for posting to a group chat.' },
+    ],
+  },
+  {
+    title: 'Your Account',
+    items: [
+      { q: 'Can I log out?', a: 'Yes — click Logout in the bracket header. You can log back in with the password at any time.' },
+    ],
+  },
+];
+
+function buildFaqHtml(filterText) {
+  const f = (filterText || '').toLowerCase().trim();
+  const categoryBlocks = faqCategories.map(cat => {
+    const items = cat.items.filter(it => !f || it.q.toLowerCase().includes(f) || it.a.toLowerCase().includes(f));
+    if (items.length === 0) return '';
+    return `<div class="faq-category">
+      <div class="faq-category-title">${esc(cat.title)}</div>
+      ${items.map(it => `<details class="faq-item"${f ? ' open' : ''}>
+        <summary class="faq-question">${esc(it.q)}</summary>
+        <div class="faq-answer">${esc(it.a)}</div>
+      </details>`).join('')}
+    </div>`;
+  }).filter(Boolean);
+  if (categoryBlocks.length === 0) return `<div class="faq-empty">No results for "${esc(filterText)}"</div>`;
+  return categoryBlocks.join('');
+}
+
+function filterFaq(value) {
+  document.getElementById('faq-grid').innerHTML = buildFaqHtml(value);
+}
 
 function showFaq() {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
-  overlay.onclick = (ev) => { if (ev.target === overlay) overlay.remove(); };
+  overlay.onclick = (ev) => { if (ev.target === overlay) closeModal(); };
   overlay.innerHTML = `
-    <div class="modal">
+    <div class="modal modal-wide">
       <div class="modal-header">
         <div class="modal-title">How It Works</div>
-        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">&#10005;</button>
+        <button class="modal-close" onclick="closeModal()">&#10005;</button>
       </div>
-      <div class="modal-body">${faqContent}</div>
+      <div class="modal-body">
+        <input type="text" id="faq-search" class="faq-search" placeholder="Search the FAQ&hellip;" oninput="filterFaq(this.value)">
+        <div id="faq-grid" class="faq-grid">${buildFaqHtml('')}</div>
+      </div>
     </div>`;
   document.body.appendChild(overlay);
+  activeModal = overlay;
+  document.addEventListener('keydown', modalKeyHandler);
+  document.getElementById('faq-search').focus();
 }
